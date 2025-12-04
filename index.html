@@ -575,7 +575,9 @@
         title: title.trim(),
         start: zeroPad(startParsed.hour) + ":" + zeroPad(startParsed.minute),
         end: zeroPad(endParsed.hour) + ":" + zeroPad(endParsed.minute),
-        colorIndex: colorIndex
+        colorIndex: colorIndex,
+        alarmStartDone: false,
+        alarmEndDone: false
       };
 
       if (!data.events[dateKey]) data.events[dateKey] = [];
@@ -671,24 +673,35 @@
       const now = new Date();
       const hh = zeroPad(now.getHours());
       const mm = zeroPad(now.getMinutes());
+      const ss = now.getSeconds();
       const currentTime = `${hh}:${mm}`;
 
-      // 같은 분은 한 번만 처리
-      if (currentTime === lastCheckedMinute) return;
-      lastCheckedMinute = currentTime;
+      // 초가 0일 때만 실행 → 매 분 정확하게 딱 한번
+      if (ss !== 0) return;
 
       for (const dateKey in data.events) {
-        const events = data.events[dateKey] || [];
+        const events = data.events[dateKey];
         for (const event of events) {
-          if (event.start === currentTime || event.end === currentTime) {
+
+          // 시작 알람
+          if (event.start === currentTime && !event.alarmStartDone) {
             playAlert();
+            event.alarmStartDone = true;
+            saveData();
+          }
+
+          // 종료 알람
+          if (event.end === currentTime && !event.alarmEndDone) {
+            playAlert();
+            event.alarmEndDone = true;
+            saveData();
           }
         }
       }
     }
 
     // 10초마다 체크 (분 단위만 비교하므로 실제 울리는 건 분당 1번씩만 가능)
-    setInterval(checkSchedules, 10000);
+    setInterval(checkSchedules, 1000);
     checkSchedules();
 
     // 초기 이벤트 렌더링
