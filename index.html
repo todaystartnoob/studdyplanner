@@ -327,7 +327,8 @@
   </div>
 
   <div class="footer-tip">
-    일정 블록을 <span>클릭</span>하면 삭제할 수 있고, 각 요일의 <span>초기화</span> 버튼으로 모두 지울 수 있어요.
+    일정 블록을 <span>클릭</span>하면 삭제, <span>우클릭</span>하면 내용 수정할 수 있고,<br>
+    각 요일의 <span>초기화</span> 버튼으로 모두 지울 수 있어요.
   </div>
 </div>
 
@@ -338,6 +339,32 @@
     const EXTRA_BOTTOM = 40;
     const TOTAL_HEIGHT = HOUR_HEIGHT * 24 + EXTRA_BOTTOM;
     const COLOR_COUNT = 7;
+
+    // ===== 알림 사운드 관련 =====
+    const alertSound = new Audio("alert.mp3"); // 같은 폴더에 alert.mp3 넣기
+    alertSound.volume = 1.0;
+    let audioUnlocked = false;
+
+    function playAlert() {
+      if (!audioUnlocked) return;
+      try {
+        alertSound.currentTime = 0;
+        alertSound.play().catch(() => {});
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // 사용자 첫 클릭 시 오디오 사용 허용
+    document.addEventListener(
+      "click",
+      function unlockAudio() {
+        audioUnlocked = true;
+        alertSound.play().catch(() => {});
+        document.removeEventListener("click", unlockAudio);
+      },
+      { once: true }
+    );
 
     function loadData() {
       try {
@@ -461,11 +488,24 @@
         escapeHtml(event.title) +
         "</div>";
 
+      // 좌클릭 → 삭제
       el.addEventListener("click", function (e) {
         e.stopPropagation();
         const ok = confirm("이 일정을 삭제할까요?");
         if (!ok) return;
         deleteEvent(dateKey, event.id);
+      });
+
+      // 우클릭 → 내용 수정 (시간은 그대로)
+      el.addEventListener("contextmenu", function (e) {
+        e.preventDefault();
+        const newTitle = prompt("내용을 수정하세요:", event.title);
+        if (newTitle === null) return; // 취소
+        const trimmed = newTitle.trim();
+        if (!trimmed) return;
+        event.title = trimmed;
+        saveData();
+        renderEventsForDate(dateKey);
       });
 
       col.appendChild(el);
@@ -553,43 +593,6 @@
       renderEventsForDate(dateKey);
     }
 
-    // 알림 사운드
-    const alertSound = new Audio("alert.mp3");
-    alertSound.volume = 1.0;
-
-    // 크롬 오디오 정책 해결 — 처음 클릭 시 사운드 허용
-    document.addEventListener("click", () => {
-      alertSound.play().catch(()=>{});
-    }, { once: true });
-
-    // 1분마다 현재 시각과 일정 비교
-    setInterval(checkSchedules, 1000 * 30); // 30초마다 체크
-
-    function checkSchedules() {
-      const now = new Date();
-      const hh = zeroPad(now.getHours());
-      const mm = zeroPad(now.getMinutes());
-      const currentTime = `${hh}:${mm}`;
-
-      for (const dateKey in data.events) {
-        for (const event of data.events[dateKey]) {
-          if (event.start === currentTime || event.end === currentTime) {
-            alertSound.play().catch(()=>{});
-          }
-        }
-      }
-    }
-
-    el.addEventListener("contextmenu", function (e) {
-      e.preventDefault();
-      const newTitle = prompt("내용을 수정하세요:", event.title);
-      if (newTitle === null) return;
-
-      event.title = newTitle.trim();
-      saveData();
-      renderEventsForDate(dateKey);
-    });
-
     function clearDay(dateKey) {
       const ok = confirm("이 날짜의 모든 일정을 삭제할까요?");
       if (!ok) return;
@@ -660,6 +663,33 @@
       last.textContent = "24:00";
       timeLabelsContainer.appendChild(last);
     })();
+
+    // ===== 일정 알림 체크 =====
+    let lastCheckedMinute = null;
+
+    function checkSchedules() {
+      const now = new Date();
+      const hh = zeroPad(now.getHours());
+      const mm = zeroPad(now.getMinutes());
+      const currentTime = `${hh}:${mm}`;
+
+      // 같은 분은 한 번만 처리
+      if (currentTime === lastCheckedMinute) return;
+      lastCheckedMinute = currentTime;
+
+      for (const dateKey in data.events) {
+        const events = data.events[dateKey] || [];
+        for (const event of events) {
+          if (event.start === currentTime || event.end === currentTime) {
+            playAlert();
+          }
+        }
+      }
+    }
+
+    // 10초마다 체크 (분 단위만 비교하므로 실제 울리는 건 분당 1번씩만 가능)
+    setInterval(checkSchedules, 10000);
+    checkSchedules();
 
     // 초기 이벤트 렌더링
     renderAllEvents();
