@@ -673,32 +673,34 @@
       const now = new Date();
       const hh = zeroPad(now.getHours());
       const mm = zeroPad(now.getMinutes());
-      const ss = now.getSeconds();
-      const currentTime = `${hh}:${mm}`;
+      const currentMinute = `${hh}:${mm}`;
 
-      // 초가 0일 때만 실행 → 매 분 정확하게 딱 한번
-      if (ss !== 0) return;
+      // 같은 분에는 한 번만 처리
+      if (currentMinute === lastCheckedMinute) return;
+      lastCheckedMinute = currentMinute;
 
       for (const dateKey in data.events) {
-        const events = data.events[dateKey];
+        const events = data.events[dateKey] || [];
+
         for (const event of events) {
 
           // 시작 알람
-          if (event.start === currentTime && !event.alarmStartDone) {
+          if (event.start === currentMinute && !event.alarmStartDone) {
             playAlert();
             event.alarmStartDone = true;
-            saveData();
           }
 
-          // 종료 알람
-          if (event.end === currentTime && !event.alarmEndDone) {
+          // 끝 알람
+          if (event.end === currentMinute && !event.alarmEndDone) {
             playAlert();
             event.alarmEndDone = true;
-            saveData();
           }
         }
       }
+
+      saveData();
     }
+
 
     // 10초마다 체크 (분 단위만 비교하므로 실제 울리는 건 분당 1번씩만 가능)
     setInterval(checkSchedules, 1000);
