@@ -553,6 +553,43 @@
       renderEventsForDate(dateKey);
     }
 
+    // 알림 사운드
+    const alertSound = new Audio("alert.mp3");
+    alertSound.volume = 1.0;
+
+    // 크롬 오디오 정책 해결 — 처음 클릭 시 사운드 허용
+    document.addEventListener("click", () => {
+      alertSound.play().catch(()=>{});
+    }, { once: true });
+
+    // 1분마다 현재 시각과 일정 비교
+    setInterval(checkSchedules, 1000 * 30); // 30초마다 체크
+
+    function checkSchedules() {
+      const now = new Date();
+      const hh = zeroPad(now.getHours());
+      const mm = zeroPad(now.getMinutes());
+      const currentTime = `${hh}:${mm}`;
+
+      for (const dateKey in data.events) {
+        for (const event of data.events[dateKey]) {
+          if (event.start === currentTime || event.end === currentTime) {
+            alertSound.play().catch(()=>{});
+          }
+        }
+      }
+    }
+
+    el.addEventListener("contextmenu", function (e) {
+      e.preventDefault();
+      const newTitle = prompt("내용을 수정하세요:", event.title);
+      if (newTitle === null) return;
+
+      event.title = newTitle.trim();
+      saveData();
+      renderEventsForDate(dateKey);
+    });
+
     function clearDay(dateKey) {
       const ok = confirm("이 날짜의 모든 일정을 삭제할까요?");
       if (!ok) return;
