@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
   <link rel="icon" type="image/png" href="studyplanner-removebg-preview.png">
   <meta charset="UTF-8" />
@@ -234,6 +235,16 @@
   <div class="app-subtitle">
     현재 주 기준으로 월~일 날짜가 자동 표시되고, 일정은 <strong>로컬 스토리지</strong>에 저장돼서 새로고침해도 유지돼요.
   </div>
+
+  <div style="display:flex; gap:8px; margin-bottom:12px;">
+    <button onclick="exportJSON()">📤 JSON 내보내기</button>
+    <label style="cursor:pointer;">
+      📥 JSON 불러오기
+      <input type="file" accept=".json" onchange="importJSON(this)" hidden>
+    </label>
+    <button onclick="exportPNG()">🖼 PNG 저장</button>
+  </div>
+  
 
   <div class="header-row">
     <div class="time-label-header">시간</div>
@@ -511,6 +522,77 @@
 
       col.appendChild(el);
     }
+    // ===== JSON 내보내기 =====
+    function exportJSON() {
+      const result = [];
+
+      for (const dateKey in data.events) {
+        data.events[dateKey].forEach(ev => {
+          result.push({
+            date: dateKey,
+            title: ev.title,
+            start: ev.start,
+            end: ev.end,
+            colorIndex: ev.colorIndex ?? 0
+          });
+        });
+      }
+
+      const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "planner.json";
+      a.click();
+    }
+
+    // ===== JSON 불러오기 =====
+    function importJSON(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const json = JSON.parse(e.target.result);
+          if (!Array.isArray(json)) throw new Error();
+
+          data.events = {};
+
+          json.forEach(item => {
+            if (!data.events[item.date]) data.events[item.date] = [];
+            data.events[item.date].push({
+              id: "e_" + Math.random().toString(36).slice(2),
+              title: item.title,
+              start: item.start,
+              end: item.end,
+              colorIndex: item.colorIndex ?? 0,
+              alarmStartDone: false,
+              alarmEndDone: false
+            });
+          });
+
+          saveData();
+          renderAllEvents();
+          alert("JSON 불러오기 완료!");
+        } catch {
+          alert("잘못된 JSON 파일입니다.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ===== PNG로 저장 =====
+    function exportPNG() {
+      const target = document.querySelector(".app");
+      html2canvas(target, { scale: 2 }).then(canvas => {
+        const a = document.createElement("a");
+        a.href = canvas.toDataURL("image/png");
+        a.download = "planner.png";
+        a.click();
+      });
+    }
+
+
 
     function clearRenderedEvents() {
       for (const dateKey in columnByDateKey) {
